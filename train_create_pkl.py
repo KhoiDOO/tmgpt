@@ -1,14 +1,23 @@
 from tokenizer import tokenize
 import os
 import pickle
+import argparse
 
-MESH_IN = "dummy_data/mesh"
-PKL_OUT = "dummy_data/pkl"
+parser = argparse.ArgumentParser()
+parser.add_argument("--mesh_in", type=str, required=True)
+parser.add_argument("--pkl_out", type=str, required=True)
+parser.add_argument("--augmentation", action='store_true')
+parser.add_argument("--forever", action='store_true')
+
+args = parser.parse_args()
+
+MESH_IN = args.mesh_in
+PKL_OUT = args.pkl_out
 
 QUANT_BIT = 7
 N_TRIAL = 10
 MAX_N_FACES = 5500
-AUGMENTATION = True
+AUGMENTATION = args.augmentation
 
 mesh_fns = os.listdir(MESH_IN)
 
@@ -24,4 +33,6 @@ while True:
             out_path = os.path.join(PKL_OUT, fn[:-4] + ".pkl")
             with open(out_path, 'wb') as f:
                 pickle.dump(io_dict, f)
-                
+    
+    if not args.forever:
+        break   

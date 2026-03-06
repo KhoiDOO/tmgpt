@@ -5,14 +5,33 @@ from accelerate.utils import DistributedDataParallelKwargs
 import os
 import yaml
 import torch
+import random
+import numpy as np
+import argparse
 
 torch._dynamo.config.optimize_ddp = False
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--train_path", type=str, required=True)
+parser.add_argument("--val_path", type=str, required=True)
+args = parser.parse_args()
+
+set_seed(args.seed)
 
 with open("configs/tmgpt.yaml","r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-TRAIN_PATH = "dummy_data/pkl"
-VAL_PATH = "dummy_data/pkl"
+TRAIN_PATH = args.train_path
+VAL_PATH = args.val_path
 
 quant_bit = config["quant_bit"]
 
