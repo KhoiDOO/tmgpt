@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dokh-tmgpt-f-4
+spec:
+  ttlSecondsAfterFinished: 60
+  template:
+    spec:
+      schedulerName: volcano
+      restartPolicy: Never
+      volumes:
+      - name: project
+        persistentVolumeClaim:
+          claimName: prj-0
+      - name: data
+        persistentVolumeClaim:
+          claimName: objarverse-clean
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 512Gi
+      containers:
+      - name: dokh-tmgpt-f-4
+        image: kohido/3d_cu128_u2204:v0.0.5
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: dokh-secret
+              key: WANDB_API_KEY
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dokh-secret
+              key: GITHUB_TOKEN
+        command: ["bash","-lc"]
+        args:
+        - |
+          set -e
+          cd /mnt/prj/
+          export HOME=/tmp
+          export XDG_CONFIG_HOME=/tmp
+          mkdir -p /tmp/.cache || true
+          if [ -d "tmgpt" ]; then
+            cd tmgpt
+            git config --global --add safe.directory /mnt/project/tmgpt
+            git fetch
+            git pull
+          else
+            git clone https://${GITHUB_TOKEN}@github.com/KhoiDOO/tmgpt.git
+            cd tmgpt/
+          fi
+          wandb login ${WANDB_API_KEY}
+          rm -rf tmp_full_4/*
+          rm -rf pkl_prep_4.log
+          rm -rf training_4.log
+          
+          # tmux new-session -d -s "tmgpt" "python3 train_create_pkl.py --mesh_in /mnt/data/mesh_500_clean/train --pkl_out tmp_full; top; exec bash"
+          # tmux split-window -h -t "tmgpt" "sleep 3; accelerate launch --mixed_precision=fp16 train.py --train_path tmp_full --val_path /mnt/data/mesh_500_clean/val_pkl; htop; exec bash"
+
+          # echo "Starting PKL creation..."
+          # python3 train_create_pkl.py --mesh_in /mnt/data/mesh_500_clean/train --pkl_out tmp_full --augmentation --forever > /mnt/prj/tmgpt/pkl_prep.log 2>&1 &
+
+          # echo "Waiting 10 seconds before starting training..."
+          # sleep 10
+          
+          # echo "Starting accelerate launch..."
+          # accelerate launch --mixed_precision=fp16 train.py --train_path tmp_full --val_path /mnt/data/mesh_500_clean/val_pkl > /mnt/prj/tmgpt/training.log 2>&1 &
+
+          # wait
+
+        volumeMounts:
+        - {name: project, mountPath: /mnt/prj/}
+        - {name: data, mountPath: /mnt/data}
+        - {name: dshm, mountPath: /dev/shm}
+        resources:
+          limits:   { nvidia.com/gpu: 4, cpu: "64",  memory: "128Gi" }
+          requests: { nvidia.com/gpu: 4, cpu: "64",  memory: "128Gi" }
